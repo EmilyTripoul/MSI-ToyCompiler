@@ -12,14 +12,18 @@ ICNST = [0-9]+
 
 %%
 <YYINITIAL> {
+"exit"		{ return new Symbol(sym.TK_EXIT);}
+"return"		{ return new Symbol(sym.TK_RETURN);}
 "print"		{ return new Symbol(sym.TK_PRINT);}
 "scan"		{ return new Symbol(sym.TK_SCAN);}
 "int"		{ return new Symbol(sym.TK_TYPE_INT);}
+"void"		{ return new Symbol(sym.TK_TYPE_VOID);}
 "if"	{ return new Symbol(sym.TK_COND_IF); }
 "then"	{ return new Symbol(sym.TK_COND_THEN); }
 "else"	{ return new Symbol(sym.TK_COND_ELSE); }
 "while"	{ return new Symbol(sym.TK_WHILE); }
 ";"		{ return new Symbol(sym.TK_DONE);}
+","		{ return new Symbol(sym.TK_COMMA);}
 {ICNST}	{ return new Symbol(sym.TK_VAL, new Integer(yytext())); }
 "+"	{ return new Symbol(sym.OP_PLUS); }
 "-"	{ return new Symbol(sym.OP_MINUS); }
@@ -34,6 +38,8 @@ ICNST = [0-9]+
 "!="	{ return new Symbol(sym.OP_NEQ); }
 ">"	{ return new Symbol(sym.OP_GREATER); }
 "<"	{ return new Symbol(sym.OP_SMALLER); }
+">="	{ return new Symbol(sym.OP_GREATER_EQ); }
+"<="	{ return new Symbol(sym.OP_SMALLER_EQ); }
 "("	{ return new Symbol(sym.TK_PAR_OPEN); }
 ")"	{ return new Symbol(sym.TK_PAR_CLOSE); }
 "{"	{ return new Symbol(sym.TK_CURLY_BRACK_OPEN); }

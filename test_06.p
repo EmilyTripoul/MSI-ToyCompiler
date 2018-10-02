@@ -3,4 +3,5 @@ int b;
 
 a[2]=1;
 b=2;
-print a[2];
+print b;
+print a[b];
