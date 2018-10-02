@@ -105,6 +105,7 @@ venv.bak/
 
 *.class
 *.java
+*.java~
 *.i
 *.o
 .compile

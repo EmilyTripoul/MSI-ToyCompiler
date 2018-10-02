@@ -5,15 +5,59 @@ import java_cup.runtime.Symbol;
 %column
 %cup
 %standalone
+%state COMMENTLINE
+%state COMMENTMULTILINE
 
 ICNST = [0-9]+
 
 %%
-
+<YYINITIAL> {
 "print"		{ return new Symbol(sym.TK_PRINT);}
-";"		{ return new Symbol(sym.TK_SEP);}
-{ICNST}		{ return new Symbol(sym.TK_ICNST, new Integer(yytext())); }
-[\ \t\n\r\f]	{ }
-.		{ System.err.println("unexpected char '" + yytext() +
-				     "' line " + yyline);
-                  return new Symbol(sym.error); }
+"scan"		{ return new Symbol(sym.TK_SCAN);}
+"int"		{ return new Symbol(sym.TK_TYPE_INT);}
+"if"	{ return new Symbol(sym.TK_COND_IF); }
+"then"	{ return new Symbol(sym.TK_COND_THEN); }
+"else"	{ return new Symbol(sym.TK_COND_ELSE); }
+"while"	{ return new Symbol(sym.TK_WHILE); }
+";"		{ return new Symbol(sym.TK_DONE);}
+{ICNST}	{ return new Symbol(sym.TK_VAL, new Integer(yytext())); }
+"+"	{ return new Symbol(sym.OP_PLUS); }
+"-"	{ return new Symbol(sym.OP_MINUS); }
+"*"	{ return new Symbol(sym.OP_MULT); }
+"/"	{ return new Symbol(sym.OP_DIVIDE); }
+"%"	{ return new Symbol(sym.OP_MODULO); }
+"="	{ return new Symbol(sym.OP_ASSIGN); }
+"||"	{ return new Symbol(sym.OP_OR); }
+"&&"	{ return new Symbol(sym.OP_AND); }
+"!"	{ return new Symbol(sym.OP_NOT); }
+"=="	{ return new Symbol(sym.OP_EQ); }
+"!="	{ return new Symbol(sym.OP_NEQ); }
+">"	{ return new Symbol(sym.OP_GREATER); }
+"<"	{ return new Symbol(sym.OP_SMALLER); }
+"("	{ return new Symbol(sym.TK_PAR_OPEN); }
+")"	{ return new Symbol(sym.TK_PAR_CLOSE); }
+"{"	{ return new Symbol(sym.TK_CURLY_BRACK_OPEN); }
+"}"	{ return new Symbol(sym.TK_CURLY_BRACK_CLOSE); }
+"["	{ return new Symbol(sym.TK_BRACK_OPEN); }
+"]"	{ return new Symbol(sym.TK_BRACK_CLOSE); }
+"?"	{ return new Symbol(sym.TK_TERNARY_TRUE); }
+":"	{ return new Symbol(sym.TK_TERNARY_FALSE); }
+"+="	{ return new Symbol(sym.OP_A_PLUS); }
+"-="	{ return new Symbol(sym.OP_A_MINUS); }
+"*="	{ return new Symbol(sym.OP_A_MULT); }
+"/="	{ return new Symbol(sym.OP_A_DIVIDE); }
+"true"	{ return new Symbol(sym.TK_VAL, new Integer(1)); }
+"false"	{ return new Symbol(sym.TK_VAL, new Integer(0)); }
+[a-zA-Z][a-zA-Z0-9]* { return new Symbol(sym.TK_IDENT, new String(yytext())); }
+"//" { yybegin(COMMENTLINE);}
+"/*" { yybegin(COMMENTMULTILINE);}
+}
+<COMMENTLINE>(\n|\r|\r\n) { yybegin(YYINITIAL);}
+<COMMENTLINE>. { }
+<COMMENTMULTILINE> "*/" {yybegin(YYINITIAL);}
+<COMMENTMULTILINE>. { }
+[\ \t\f\n\r(\r\n)] {  }
+.	{ System.err.println("unexpected char '" + yytext() +
+			     "' line " + yyline);
+    return new Symbol(sym.error);
+  }

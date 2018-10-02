@@ -4,8 +4,36 @@ import java.io.*;
 
 parser code {:
   public static void main(String args[]) throws Exception {
-    new Parser(new Lexer(new InputStreamReader(System.in))).parse();
+    scopeId="";
+    labelUuid=0;
+    change_scope("main");
+    if(args.length==0) {
+      new Parser(new Lexer(new InputStreamReader(System.in))).parse();
+    } else {
+      new Parser(new Lexer(new StringReader(args[0]))).parse();
+    }  
   }
+  public static void change_scope(String var) {
+    scopeId=var;
+  }
+  public static void add_scope(String var) {
+    scopeId=scopeId+var;
+  }
+  public static void remove_scope(String var) {
+    scopeId=scopeId.substring(0, scopeId.length() - (var.length()+1));
+  }
+  public static String make_scoped(String var) {
+    return scopeId+"_" + var;
+  }
+  public static String make_var(String var) {
+    return "var_" + make_scoped(var);
+  }
+  public static String make_label() {
+    labelUuid++;
+    return "label_" + labelUuid + "_";
+  }
+  public static String scopeId;
+  public static Integer labelUuid;
 :}
 
 action code {:
@@ -14,36 +42,165 @@ action code {:
   String make_inst(String lab, String op, String arg) {
     return lab + "\t" + op + "\t" + arg + "\n";
   }
+  String make_inst(String lab, String op, int arg) {
+    return lab + "\t" + op + "\t" + arg + "\n";
+  }
 
   String make_comm(String comment) {
     return ";/ " + comment + "\n";
   }
+
 :}
 
-terminal TK_SEP, TK_PRINT;
-terminal Integer TK_ICNST;
+terminal OP_PLUS, OP_MINUS, OP_MULT, OP_DIVIDE, OP_MODULO, OP_ASSIGN, 
+        OP_NOT, OP_AND, OP_OR,
+        OP_EQ, OP_NEQ, OP_GREATER, OP_SMALLER,
+        TK_TERNARY_TRUE, TK_TERNARY_FALSE,
+        OP_A_PLUS, OP_A_MINUS, OP_A_MULT, OP_A_DIVIDE;
+terminal TK_PAR_OPEN, TK_PAR_CLOSE, TK_CURLY_BRACK_OPEN, TK_CURLY_BRACK_CLOSE, TK_BRACK_OPEN, TK_BRACK_CLOSE,
+          TK_COND_IF, TK_COND_THEN, TK_COND_ELSE, TK_WHILE,
+          TK_TYPE_INT;
+terminal TK_DONE;
+terminal TK_PRINT, TK_SCAN;
+terminal Integer TK_VAL; 
+terminal String TK_IDENT;
 
 non terminal target;
-non terminal String program, linst, inst, print, expr;
+non terminal String program, linst, inst, print, scanf, expr, cond_if, cond_then, cond_else, while_cond;
+
+// associativite et priorite des operateurs
+precedence left expr;
+precedence left OP_ASSIGN, OP_A_PLUS, OP_A_MINUS, OP_A_MULT, OP_A_DIVIDE;
+precedence left TK_TERNARY_TRUE, TK_TERNARY_FALSE;
+precedence left OP_SMALLER, OP_GREATER;
+precedence left OP_AND;
+precedence left OP_OR;
+precedence left OP_MODULO;
+precedence left OP_PLUS, OP_MINUS;
+precedence left OP_MULT, OP_DIVIDE;
+precedence left TK_PAR_OPEN;
+precedence left OP_NOT;
+precedence left TK_VAL, TK_IDENT;
+precedence left TK_BRACK_OPEN;
 
 start with target;
 
 target ::= program:s {: System.out.println(s); :}
   ;
 
-program ::= linst:l {: RESULT = l + "\tSTOP\n"; :}
+program ::= linst:l {: RESULT = 
+      make_inst("_REG_A","DS", 1)
+      +make_inst("_REG_B","DS", 1)
+      +make_inst("_REG_C","DS", 1)
+      +l + "\tSTOP\n"; :}
   ;
 linst ::= inst:i {: RESULT = i; :}
   | linst:l inst:i {: RESULT = l + i; :}
   ;
-inst  ::= print:i TK_SEP {: RESULT = i; :}
-	| TK_SEP {: RESULT = ""; :}
+inst  ::= print:i TK_DONE {: RESULT = i; :}
+  | scanf:i TK_DONE {: RESULT = i; :}
+	| TK_DONE {: RESULT = ""; :}
+  | TK_TYPE_INT TK_IDENT:i TK_BRACK_OPEN TK_VAL:i2 TK_BRACK_CLOSE {: RESULT = make_inst(make_var(i),"DS", i2); :}
+  | TK_TYPE_INT TK_IDENT:i TK_DONE {: 
+	    String comment = make_comm("declaration variable...");
+      RESULT = comment + make_inst(make_var(i),"DS", 1); :}
+  | TK_IDENT:i OP_ASSIGN expr:e TK_DONE {:       
+      String comment = make_comm("assignation variable...");
+      RESULT = comment
+        +make_inst("","PUSH",make_var(i))
+        +e
+        +make_inst("","STORE",""); :}
+  | TK_IDENT:i TK_BRACK_OPEN TK_VAL:i2 TK_BRACK_CLOSE OP_ASSIGN expr:e TK_DONE {:       
+      String comment = make_comm("assignation variable...");
+      RESULT = comment
+        +make_inst("","PUSH",make_var(i))
+        +make_inst("","PUSH",i2.toString())
+        +make_inst("","ADD","")
+        +e
+        +make_inst("","STORE",""); :}
+  | cond_if:c {: RESULT = c;:}
+  | while_cond:c {: RESULT=c;:}
+  //| TK_CURLY_BRACK_OPEN linst:i TK_CURLY_BRACK_CLOSE {: RESULT=i; :}
 	;
 print ::= TK_PRINT expr:e
         {:
 	    String comment = make_comm("print...");
-	    RESULT = comment + e + "\tOUT\n";
+	    RESULT = comment + e 
+        +make_inst("","OUT","");
 	:}
 	;
-expr ::= TK_ICNST:i {: RESULT = "\tPUSH\t" + i + "\n"; :}
+
+scanf ::= TK_SCAN TK_IDENT:i
+        {:
+	    String comment = make_comm("scan...");
+	    RESULT = comment 
+      +make_inst("","PUSH",make_var(i))
+      +make_inst("","IN","")
+      +make_inst("","STORE","");
+	:}
 	;
+
+cond_if ::= 
+  TK_COND_IF expr:e TK_CURLY_BRACK_OPEN linst:i1 TK_CURLY_BRACK_CLOSE {: 
+      String label = make_label();  
+	    String comment = make_comm("if..." + label);    
+      RESULT = comment +e
+      +make_inst("","BEZ",label+"End")
+      +i1
+      +make_inst(label+"End", "EQU", "*");
+      :}
+  | TK_COND_IF expr:e TK_CURLY_BRACK_OPEN linst:i1 TK_CURLY_BRACK_CLOSE TK_COND_ELSE TK_CURLY_BRACK_OPEN linst:i2 TK_CURLY_BRACK_CLOSE {: 
+      String label = make_label();  
+	    String comment = make_comm("if..." + label);    
+      RESULT = comment +e
+      +make_inst("","BEZ",label+"False")
+      +i1
+      +make_inst("","PUSH",label+"End")
+      +make_inst("","GOTO","")
+      +make_inst(label+"False", "EQU", "*")
+      +i2
+      +make_inst(label+"End", "EQU", "*");
+      :}
+      ;
+while_cond ::= TK_WHILE expr:e TK_CURLY_BRACK_OPEN linst:i1 TK_CURLY_BRACK_CLOSE {:
+      String label = make_label();  
+	    String comment = make_comm("while..." + label);    
+      RESULT = comment       
+      +make_inst(label+"Cond", "EQU", "*")
+      +e
+      +make_inst("","BEZ",label+"False")
+      +i1
+      +make_inst("","PUSH",label+"Cond")
+      +make_inst("","GOTO","")
+      +make_inst(label+"False", "EQU", "*");
+      :}
+      ;
+expr ::= TK_VAL:i {: RESULT = make_inst("","PUSH",i.toString()); :}
+  | TK_IDENT:i {: RESULT = make_inst("","PUSH",make_var(i))+make_inst("","LOAD",""); :}
+  | TK_IDENT:i TK_BRACK_OPEN TK_VAL:i2 TK_BRACK_CLOSE {: 
+      RESULT = 
+      make_inst("","PUSH",make_var(i))
+      +make_inst("","PUSH",i2.toString())
+      +make_inst("","ADD",""); :}
+  | expr:e1 OP_PLUS expr:e2 {: RESULT = e1+e2+make_inst("","ADD",""); :}
+  | expr:e1 OP_MINUS expr:e2 {: RESULT = e1+e2+make_inst("","SUB",""); :}
+  | expr:e1 OP_MULT expr:e2 {: RESULT = e1+e2+make_inst("","MUL",""); :}
+  | expr:e1 OP_DIVIDE expr:e2 {: RESULT = e1+e2+make_inst("","DIV",""); :}
+  | expr:e1 OP_MODULO expr:e2 {: 
+      RESULT = 
+      make_inst("","PUSH","_REG_A")
+      +e1
+      +make_inst("","STORE","")
+      +make_inst("","PUSH","_REG_B")
+      +e2
+      +make_inst("","STORE","")
+      +make_inst("","PUSH","_REG_A")+make_inst("","LOAD","")
+      +make_inst("","PUSH","_REG_B")+make_inst("","LOAD","")
+      +make_inst("","PUSH","_REG_A")+make_inst("","LOAD","")
+      +make_inst("","PUSH","_REG_B")+make_inst("","LOAD","")
+      +make_inst("","DIV","")
+      +make_inst("","MUL","")
+      +make_inst("","SUB",""); :}
+  | TK_PAR_OPEN expr:e1 TK_PAR_CLOSE {: RESULT = e1; :}
+	;
+

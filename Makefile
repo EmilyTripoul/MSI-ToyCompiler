@@ -36,6 +36,9 @@ compile: .compile
 	$(JAVAC) $(JFLAGS) *.java
 	touch $@
 
+test: *.p;
+	@echo $<
+
 # disable all default rules
 .SUFFIXES:
 
